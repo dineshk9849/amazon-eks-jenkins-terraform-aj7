@@ -1,0 +1,73 @@
+pipeline{
+    agent any
+    tools{
+       jdk 'jdk11'
+        maven 'maven3'
+    }
+    stages{
+        stage ('clean workspace'){
+        steps{
+            cleanWs()
+        }
+        }
+        stage ('checkout from scm'){
+            steps {
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/dineshk9849/amazon-eks-jenkins-terraform-aj7.git']])
+            }
+        }
+        stage ('maven compile'){
+            steps {
+                sh 'mvn clean compile'
+            }
+        }
+        stage ('sonarqube analysis'){
+            steps{
+                script{
+                    withSonarQubeEnv(credentialsId: 'sonarqube'){
+                        sh 'mvn sonar:sonar'
+                    }
+                }
+            }
+        }
+         stage ('Quality  gate'){
+            steps{
+                script{
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonarqube'
+                }
+            }
+        }
+         stage("OWASP Dependency Check"){
+            steps{
+                dependencyCheck additionalArguments: '--scan ./ --format HTML ', odcInstallation: 'DP-Check'
+                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            }
+        }
+            stage("Build"){
+            steps{
+                sh " mvn clean install"
+            }
+        }
+ stage("Docker Build & Push"){
+            steps{
+                script{
+                  withDockerRegistry(credentialsId: 'dinesh9849', toolName: 'docker') { 
+                        sh "docker build -t petclinic1 ."
+                        sh "docker tag petclinic1 dinesh9849/pet-clinic123:latest "
+                        sh "docker push dinesh9849/pet-clinic123:latest "
+                    
+                    }
+                }
+            }
+        }
+        stage("TRIVY"){
+            steps{
+                sh "trivy image dinesh9849/pet-clinic123:latest"
+            }
+        }
+        stage ('Deploy to container'){
+            steps{
+                sh 'docker run -d --name pet2 -p 8082:8080 dinesh9849/pet-clinic123:latest'
+            }
+        }
+    }
+}
