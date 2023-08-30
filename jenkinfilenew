@@ -36,12 +36,6 @@ pipeline{
                 }
             }
         }
-         stage("OWASP Dependency Check"){
-            steps{
-                dependencyCheck additionalArguments: '--scan ./ --format HTML ', odcInstallation: 'DP-Check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-            }
-        }
             stage("Build"){
             steps{
                 sh " mvn clean install"
@@ -66,7 +60,7 @@ pipeline{
         }
         stage ('Deploy to container'){
             steps{
-                sh 'docker run -d --name pet3 -p 8082:8080 dinesh9849/pet-clinic123:latest'
+                sh 'docker run -d --name pet4 -p 8082:8080 dinesh9849/pet-clinic123:latest'
             }
         }
     }
